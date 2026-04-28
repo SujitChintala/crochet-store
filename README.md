@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Crochet Store (Next.js + MongoDB)
 
-## Getting Started
+Mobile-first ecommerce app for a crochet business.  
+Backend uses Next.js API routes with MongoDB Atlas and Mongoose.
 
-First, run the development server:
+## Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Required environment variables:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `MONGODB_URI`
+- `MONGODB_DB` (optional if database name is in URI)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Product data model
 
-## Learn More
+Products are stored with schema validation and include:
 
-To learn more about Next.js, take a look at the following resources:
+- `name` (string, required, max 120 chars)
+- `price` (number, required, min 0)
+- `images` (string[], required, at least one)
+- `description` (string, required, max 2000 chars)
+- `status` (`in_stock` | `out_of_stock` | `preorder`)
+- `isAvailable` (boolean)
+- `deliveryTime` (string, default `Ships within 3-5 business days.`)
+- `details` (flexible object for future product attributes)
+- `createdAt`, `updatedAt` (timestamps)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The model uses the `models.Product || model("Product", ...)` pattern to prevent duplicate model compilation during Next.js hot reload/serverless execution.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Product API
 
-## Deploy on Vercel
+### `GET /api/products`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Returns all products (newest first).  
+Optional query params:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `status`: `in_stock`, `out_of_stock`, `preorder`
+- `available`: `true` or `false`
+
+### `POST /api/products`
+
+Creates a product with request validation via payload checks + Mongoose schema validation.
+
+Example payload:
+
+```json
+{
+  "name": "Daisy Keychain",
+  "price": 9.99,
+  "images": ["https://example.com/daisy.png"],
+  "description": "Handmade crochet flower keychain.",
+  "status": "in_stock",
+  "isAvailable": true,
+  "deliveryTime": "Ships in 2-4 business days",
+  "details": {
+    "color": "white-yellow",
+    "material": "cotton yarn",
+    "size_cm": 6
+  }
+}
+```
+
+### `GET /api/products/[id]`
+
+Returns a single product by MongoDB ObjectId.
