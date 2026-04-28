@@ -104,7 +104,7 @@ export default async function ProductDetailPage(props: PageProps<"/products/[id]
 
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700">
             <p className="font-semibold text-zinc-900">Delivery</p>
-            <p className="mt-1">{product.deliveryDetails}</p>
+            <p className="mt-1">{product.deliveryTime}</p>
           </div>
 
           <button
