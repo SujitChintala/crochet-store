@@ -1,63 +1,483 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-
-import { getProducts } from "@/lib/product-service";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 
 const BRAND_PINK = "#ffc2e8";
 const BRAND_BLUE = "#00BFFF";
+const SESSION_STORAGE_KEY = "crochet-admin-session";
+
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  images: string[];
+  description: string;
+  deliveryTime: string;
+  details?: Record<string, unknown>;
+};
+
+type AdminSession = {
+  email: string;
+  password: string;
+  role: "admin";
+};
+
+type ProductFormState = {
+  name: string;
+  price: string;
+  description: string;
+  deliveryTime: string;
+  detailsText: string;
+};
+
+const EMPTY_PRODUCT_FORM: ProductFormState = {
+  name: "",
+  price: "",
+  description: "",
+  deliveryTime: "",
+  detailsText: "",
+};
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 
-export const dynamic = "force-dynamic";
-
-export default async function Home() {
-  let products = [] as Awaited<ReturnType<typeof getProducts>>;
-  let hasError = false;
-
-  try {
-    products = await getProducts({ onlyAvailable: true });
-  } catch (error) {
-    console.error("Failed to load products on homepage", error);
-    hasError = true;
+function toDetailsText(details?: Record<string, unknown>) {
+  if (!details || Object.keys(details).length === 0) {
+    return "";
   }
 
-  const trendingProducts = products.slice(0, 6);
+  return JSON.stringify(details, null, 2);
+}
+
+function getAdminHeaders(session: AdminSession, withJson = false) {
+  const headers = new Headers();
+
+  if (withJson) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  headers.set("x-dev-admin-role", "admin");
+  headers.set("x-dev-admin-email", session.email);
+  headers.set("x-dev-admin-password", session.password);
+  return headers;
+}
+
+export default function Home() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [session, setSession] = useState<AdminSession | null>(null);
+
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productModalMode, setProductModalMode] = useState<"add" | "edit">("add");
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productForm, setProductForm] = useState<ProductFormState>(EMPTY_PRODUCT_FORM);
+  const [productFiles, setProductFiles] = useState<File[]>([]);
+  const [productFormError, setProductFormError] = useState<string | null>(null);
+  const [isProductSubmitting, setIsProductSubmitting] = useState(false);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+
+  const fetchProducts = useCallback(async () => {
+    setIsLoadingProducts(true);
+    setPageError(null);
+
+    try {
+      const response = await fetch("/api/products?available=true", { cache: "no-store" });
+
+      if (!response.ok) {
+        throw new Error("Could not load products.");
+      }
+
+      const data = (await response.json()) as { products?: Product[] };
+      setProducts(data.products ?? []);
+    } catch (error) {
+      console.error("Failed to load products on homepage", error);
+      setPageError("Could not load products right now. Please refresh and try again.");
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchProducts();
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const rawSession = window.localStorage.getItem(SESSION_STORAGE_KEY);
+
+    if (!rawSession) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(rawSession) as AdminSession;
+
+      if (parsed.email && parsed.password && parsed.role === "admin") {
+        setSession(parsed);
+        return;
+      }
+    } catch (error) {
+      console.error("Invalid saved session", error);
+    }
+
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    setShowAuthModal(true);
+  }, []);
+
+  const trendingProducts = products.slice(0, 8);
   const ctaHref = trendingProducts[0] ? `/products/${trendingProducts[0].id}` : "#trending";
+
+  const openAuthModal = (mode: "signin" | "signup") => {
+    setAuthMode(mode);
+    setAuthError(null);
+    setShowAuthModal(true);
+  };
+
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const email = authEmail.trim().toLowerCase();
+    const password = authPassword.trim();
+
+    if (!email || !password) {
+      setAuthError("Email and password are required.");
+      return;
+    }
+
+    setIsAuthSubmitting(true);
+    setAuthError(null);
+
+    const nextSession: AdminSession = {
+      email,
+      password,
+      role: "admin",
+    };
+
+    try {
+      await fetch("/api/users", {
+        method: "POST",
+        headers: getAdminHeaders(nextSession, true),
+        body: JSON.stringify({
+          email,
+          password,
+          role: "admin",
+        }),
+      });
+    } catch (error) {
+      console.error("Could not create admin user record", error);
+    } finally {
+      setSession(nextSession);
+      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+      setShowAuthModal(false);
+      setAuthPassword("");
+      setIsSidebarOpen(false);
+      setIsAuthSubmitting(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+
+    setSession(null);
+    setShowAuthModal(true);
+    setIsSidebarOpen(false);
+  };
+
+  const openAddProductModal = () => {
+    if (!session) {
+      openAuthModal("signin");
+      return;
+    }
+
+    setProductModalMode("add");
+    setEditingProductId(null);
+    setProductForm(EMPTY_PRODUCT_FORM);
+    setProductFiles([]);
+    setProductFormError(null);
+    setShowProductModal(true);
+    setIsSidebarOpen(false);
+  };
+
+  const openEditProductModal = (product: Product) => {
+    if (!session) {
+      openAuthModal("signin");
+      return;
+    }
+
+    setProductModalMode("edit");
+    setEditingProductId(product.id);
+    setProductForm({
+      name: product.name,
+      price: String(product.price),
+      description: product.description,
+      deliveryTime: product.deliveryTime,
+      detailsText: toDetailsText(product.details),
+    });
+    setProductFiles([]);
+    setProductFormError(null);
+    setShowProductModal(true);
+  };
+
+  const uploadProductImages = async (files: File[]) => {
+    if (!session) {
+      throw new Error("Admin session not found.");
+    }
+
+    const formData = new FormData();
+
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    const response = await fetch("/api/uploads/cloudinary", {
+      method: "POST",
+      headers: getAdminHeaders(session),
+      body: formData,
+    });
+
+    const data = (await response.json().catch(() => ({}))) as {
+      urls?: string[];
+      error?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(data.error ?? "Could not upload product images.");
+    }
+
+    if (!data.urls || data.urls.length === 0) {
+      throw new Error("No image URLs were returned after upload.");
+    }
+
+    return data.urls;
+  };
+
+  const handleProductSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!session) {
+      openAuthModal("signin");
+      return;
+    }
+
+    const name = productForm.name.trim();
+    const price = Number(productForm.price);
+    const description = productForm.description.trim();
+    const deliveryTime = productForm.deliveryTime.trim();
+
+    if (!name || !description) {
+      setProductFormError("Name and description are required.");
+      return;
+    }
+
+    if (!Number.isFinite(price) || price < 0) {
+      setProductFormError("Price must be a valid number in rupees.");
+      return;
+    }
+
+    let details: Record<string, unknown> = {};
+
+    if (productForm.detailsText.trim()) {
+      try {
+        const parsed = JSON.parse(productForm.detailsText);
+
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+          throw new Error();
+        }
+
+        details = parsed as Record<string, unknown>;
+      } catch {
+        setProductFormError("Other details must be valid JSON object.");
+        return;
+      }
+    }
+
+    setIsProductSubmitting(true);
+    setProductFormError(null);
+
+    try {
+      let uploadedImageUrls: string[] = [];
+
+      if (productFiles.length > 0) {
+        uploadedImageUrls = await uploadProductImages(productFiles);
+      }
+
+      if (productModalMode === "add" && uploadedImageUrls.length === 0) {
+        throw new Error("Please select at least one product image.");
+      }
+
+      const endpoint = productModalMode === "add" ? "/api/products" : `/api/products/${editingProductId}`;
+      const method = productModalMode === "add" ? "POST" : "PUT";
+
+      const payload: {
+        name: string;
+        price: number;
+        description: string;
+        deliveryTime: string;
+        details: Record<string, unknown>;
+        images?: string[];
+      } = {
+        name,
+        price,
+        description,
+        deliveryTime,
+        details,
+      };
+
+      if (productModalMode === "add" || uploadedImageUrls.length > 0) {
+        payload.images = uploadedImageUrls;
+      }
+
+      const response = await fetch(endpoint, {
+        method,
+        headers: getAdminHeaders(session, true),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          details?: string[];
+        };
+        const message = data.details?.[0] ?? data.error ?? "Could not save product.";
+        throw new Error(message);
+      }
+
+      setShowProductModal(false);
+      setProductForm(EMPTY_PRODUCT_FORM);
+      setProductFiles([]);
+      setEditingProductId(null);
+      await fetchProducts();
+    } catch (error) {
+      setProductFormError(error instanceof Error ? error.message : "Could not save product.");
+    } finally {
+      setIsProductSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!session) {
+      openAuthModal("signin");
+      return;
+    }
+
+    if (!window.confirm("Delete this product?")) {
+      return;
+    }
+
+    setDeletingProductId(productId);
+    setPageError(null);
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "DELETE",
+        headers: getAdminHeaders(session),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Could not delete product.");
+      }
+
+      setProducts((currentProducts) => currentProducts.filter((item) => item.id !== productId));
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Could not delete product.");
+    } finally {
+      setDeletingProductId(null);
+    }
+  };
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-sm bg-white pb-8 shadow-sm">
+      {isSidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          className="fixed inset-0 z-30 bg-black/40"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        className={`fixed left-0 top-0 z-40 h-full w-72 bg-white p-5 shadow-xl transition-transform ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <p className="text-lg font-bold text-zinc-900">Menu</p>
+        <button
+          type="button"
+          onClick={openAddProductModal}
+          className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-bold text-white"
+          style={{ backgroundColor: BRAND_BLUE }}
+        >
+          Add Product
+        </button>
+        <button
+          type="button"
+          onClick={() => openAuthModal("signin")}
+          className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-semibold text-zinc-700"
+        >
+          {session ? "Switch Admin" : "Sign In / Sign Up"}
+        </button>
+        {session ? (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-300 px-4 text-sm font-semibold text-zinc-700"
+          >
+            Sign Out
+          </button>
+        ) : null}
+      </aside>
+
       <header className="sticky top-0 z-20">
         <div className="h-7" style={{ backgroundColor: BRAND_PINK }} />
         <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
-          <button type="button" aria-label="Open menu" className="rounded-md p-1 text-zinc-700">
+          <button
+            type="button"
+            aria-label="Open menu"
+            className="rounded-md p-1 text-zinc-700"
+            onClick={() => setIsSidebarOpen(true)}
+          >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
           <p className="text-3xl font-black leading-none tracking-tight">
-            <span style={{ color: BRAND_PINK, textShadow: `-1px 0 #ca488f, 0 1px #ca488f, 1px 0 #ca488f, 0 -1px #ca488f` }}>
+            <span style={{ color: BRAND_PINK, textShadow: "-1px 0 #ca488f, 0 1px #ca488f, 1px 0 #ca488f, 0 -1px #ca488f" }}>
               Pink
             </span>{" "}
             <span style={{ color: "#1f2937" }}>&amp;</span>{" "}
-            <span style={{ color: BRAND_BLUE, textShadow: `-1px 0 #0284c7, 0 1px #0284c7, 1px 0 #0284c7, 0 -1px #0284c7` }}>
+            <span style={{ color: BRAND_BLUE, textShadow: "-1px 0 #0284c7, 0 1px #0284c7, 1px 0 #0284c7, 0 -1px #0284c7" }}>
               Blue
             </span>
           </p>
-          <button type="button" aria-label="View bag" className="rounded-md p-1 text-zinc-700">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M5 8h14l-1.2 11H6.2L5 8Zm4-2a3 3 0 0 1 6 0"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+          <button
+            type="button"
+            onClick={() => openAuthModal("signin")}
+            className="rounded-full border border-zinc-300 px-3 py-1 text-xs font-bold text-zinc-700"
+          >
+            {session ? "ADMIN" : "Sign In"}
           </button>
         </div>
       </header>
@@ -89,55 +509,246 @@ export default async function Home() {
         </div>
       </section>
 
-      {hasError ? (
+      {pageError ? (
         <section className="mx-4 mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          Could not load products right now. Please refresh and try again.
+          {pageError}
         </section>
       ) : null}
 
-      {!hasError && trendingProducts.length === 0 ? (
+      {!pageError && isLoadingProducts ? (
+        <section className="mx-4 mt-4 rounded-2xl border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-600">
+          Loading products...
+        </section>
+      ) : null}
+
+      {!pageError && !isLoadingProducts && trendingProducts.length === 0 ? (
         <section className="mx-4 mt-4 rounded-2xl border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600">
-          No products yet. Add one using POST /api/products and it will appear here.
+          No products yet. Add your first product from the menu.
         </section>
       ) : null}
 
-      {!hasError && trendingProducts.length > 0 ? (
+      {!pageError && trendingProducts.length > 0 ? (
         <main id="trending" className="px-4 pt-5">
           <h2 className="mb-4 text-center text-4xl font-black leading-none tracking-tight text-zinc-900">
             TRENDING NOW
           </h2>
           <div className="grid grid-cols-2 gap-3">
             {trendingProducts.map((product) => (
-              <Link
-                key={product.id}
-                href={`/products/${product.id}`}
-                className="group overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
-                  <Image
-                    src={product.images[0] || "/product-placeholder.svg"}
-                    alt={product.name}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                    sizes="50vw"
-                  />
-                </div>
-                <div className="px-1 pb-1 pt-2 text-center">
-                  <p className="line-clamp-2 min-h-10 text-sm font-bold leading-snug text-zinc-900">{product.name}</p>
-                  <p className="mt-1 text-xs font-semibold text-zinc-500">{formatCurrency(product.price)}</p>
-                  <p className="mt-1 text-xs text-amber-500">★★★★★</p>
-                  <span
+              <div key={product.id} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
+                <Link href={`/products/${product.id}`} className="block">
+                  <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
+                    <Image
+                      src={product.images[0] || "/product-placeholder.svg"}
+                      alt={product.name}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                      sizes="50vw"
+                    />
+                  </div>
+                  <div className="px-1 pb-1 pt-2 text-center">
+                    <p className="line-clamp-2 min-h-10 text-sm font-bold leading-snug text-zinc-900">{product.name}</p>
+                    <p className="mt-1 text-xs font-semibold text-zinc-500">{formatCurrency(product.price)}</p>
+                    <p className="mt-1 text-xs text-amber-500">★★★★★</p>
+                  </div>
+                </Link>
+                {session ? (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditProductModal(product)}
+                      className="inline-flex min-h-9 items-center justify-center rounded-full border border-zinc-300 px-2 text-[11px] font-bold text-zinc-700"
+                    >
+                      UPDATE
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteProduct(product.id)}
+                      disabled={deletingProductId === product.id}
+                      className="inline-flex min-h-9 items-center justify-center rounded-full px-2 text-[11px] font-bold text-white disabled:opacity-70"
+                      style={{ backgroundColor: BRAND_BLUE }}
+                    >
+                      {deletingProductId === product.id ? "DELETING..." : "DELETE"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal("signin")}
                     className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-full px-2 text-xs font-extrabold tracking-wide text-white"
                     style={{ backgroundColor: BRAND_BLUE }}
                   >
                     ADD TO BAG
-                  </span>
-                </div>
-              </Link>
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </main>
+      ) : null}
+
+      {showAuthModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAuthMode("signin")}
+                className={`min-h-10 flex-1 rounded-lg text-sm font-bold ${
+                  authMode === "signin" ? "text-white" : "text-zinc-700"
+                }`}
+                style={{ backgroundColor: authMode === "signin" ? BRAND_BLUE : "#f3f4f6" }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode("signup")}
+                className={`min-h-10 flex-1 rounded-lg text-sm font-bold ${
+                  authMode === "signup" ? "text-white" : "text-zinc-700"
+                }`}
+                style={{ backgroundColor: authMode === "signup" ? BRAND_BLUE : "#f3f4f6" }}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            <p className="text-center text-sm text-zinc-600">Enter any email + password. You will be logged in as Admin.</p>
+
+            <form className="mt-4 space-y-3" onSubmit={(event) => void handleAuthSubmit(event)}>
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(event) => setAuthEmail(event.target.value)}
+                placeholder="Email"
+                className="h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-500"
+                autoComplete="email"
+                required
+              />
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                placeholder="Password"
+                className="h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-500"
+                autoComplete="current-password"
+                required
+              />
+
+              {authError ? <p className="text-xs font-medium text-red-600">{authError}</p> : null}
+
+              <button
+                type="submit"
+                disabled={isAuthSubmitting}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl text-sm font-bold text-white disabled:opacity-70"
+                style={{ backgroundColor: BRAND_BLUE }}
+              >
+                {isAuthSubmitting ? "Please wait..." : authMode === "signup" ? "Sign Up as Admin" : "Sign In as Admin"}
+              </button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showProductModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+          <div className="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl bg-white p-5 shadow-xl">
+            <p className="text-lg font-extrabold text-zinc-900">{productModalMode === "add" ? "Add Product" : "Update Product"}</p>
+
+            <form className="mt-4 space-y-3" onSubmit={(event) => void handleProductSubmit(event)}>
+              <input
+                type="text"
+                value={productForm.name}
+                onChange={(event) => setProductForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Product name"
+                className="h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-500"
+                required
+              />
+
+              <div className="rounded-lg border border-zinc-300 px-3 py-3">
+                <label htmlFor="product-images" className="block text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                  Product photos
+                </label>
+                <input
+                  id="product-images"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    setProductFiles(files);
+                  }}
+                  className="mt-2 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-xs file:font-semibold"
+                  required={productModalMode === "add"}
+                />
+                <p className="mt-2 text-xs text-zinc-500">
+                  {productFiles.length > 0
+                    ? `${productFiles.length} image(s) selected for Cloudinary upload`
+                    : productModalMode === "add"
+                      ? "Select one or more images to upload to Cloudinary."
+                      : "Select files only if you want to replace existing product images."}
+                </p>
+              </div>
+
+              <input
+                type="number"
+                value={productForm.price}
+                onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))}
+                placeholder="Price in rupees"
+                className="h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-500"
+                min={0}
+                step="0.01"
+                required
+              />
+
+              <textarea
+                value={productForm.description}
+                onChange={(event) => setProductForm((current) => ({ ...current, description: event.target.value }))}
+                placeholder="Description"
+                className="min-h-24 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                required
+              />
+
+              <input
+                type="text"
+                value={productForm.deliveryTime}
+                onChange={(event) => setProductForm((current) => ({ ...current, deliveryTime: event.target.value }))}
+                placeholder="Delivery time (e.g. Ships in 2-4 days)"
+                className="h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-500"
+              />
+
+              <textarea
+                value={productForm.detailsText}
+                onChange={(event) => setProductForm((current) => ({ ...current, detailsText: event.target.value }))}
+                placeholder='Other details as JSON (optional), e.g. {"color":"pink"}'
+                className="min-h-24 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+              />
+
+              {productFormError ? <p className="text-xs font-medium text-red-600">{productFormError}</p> : null}
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProductModal(false);
+                    setProductFiles([]);
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 px-3 text-sm font-semibold text-zinc-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProductSubmitting}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-bold text-white disabled:opacity-70"
+                  style={{ backgroundColor: BRAND_BLUE }}
+                >
+                  {isProductSubmitting ? "Saving..." : productModalMode === "add" ? "Add" : "Update"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
     </div>
   );

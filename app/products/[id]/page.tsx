@@ -5,9 +5,9 @@ import { notFound } from "next/navigation";
 import { getProductById } from "@/lib/product-service";
 
 function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
   }).format(amount);
 }
 

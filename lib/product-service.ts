@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+import { normalizeProductImageUrl } from "@/lib/image-url";
 import { connectToDatabase } from "@/lib/mongodb";
 import {
   Product,
@@ -23,6 +24,17 @@ export type ProductView = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type ProductUpdateInput = Partial<{
+  name: string;
+  price: number;
+  images: string[];
+  description: string;
+  status: ProductStatus;
+  isAvailable: boolean;
+  deliveryTime: string;
+  details: ProductDetails;
+}>;
 
 type ProductRecord = {
   _id: { toString(): string };
@@ -75,7 +87,7 @@ function mapProduct(product: ProductRecord): ProductView {
     id: product._id.toString(),
     name: product.name,
     price: product.price,
-    images: product.images,
+    images: product.images.map((image) => normalizeProductImageUrl(image)),
     description: product.description,
     status: product.status,
     isAvailable: product.isAvailable,
@@ -142,4 +154,32 @@ export async function createProduct(input: ProductInput) {
   }
 
   return mapProduct(createdProduct);
+}
+
+export async function updateProductById(id: string, input: ProductUpdateInput) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return null;
+  }
+
+  await connectToDatabase();
+  const updated = await Product.findByIdAndUpdate(id, input, {
+    new: true,
+    runValidators: true,
+  }).lean<ProductRecord>();
+
+  if (!updated) {
+    return null;
+  }
+
+  return mapProduct(updated);
+}
+
+export async function deleteProductById(id: string) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return false;
+  }
+
+  await connectToDatabase();
+  const deleted = await Product.findByIdAndDelete(id).select("_id").lean<{ _id: mongoose.Types.ObjectId }>();
+  return Boolean(deleted);
 }
