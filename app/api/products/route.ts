@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth";
+import { normalizeProductImageUrl } from "@/lib/image-url";
 import {
   createProduct,
   getProducts,
@@ -11,6 +12,11 @@ import {
 import { type ProductDetails, type ProductInput } from "@/models/Product";
 
 export const dynamic = "force-dynamic";
+const INRCurrencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
 
 class RequestValidationError extends Error {
   constructor(message: string) {
@@ -39,7 +45,9 @@ function normalizeCreateProductPayload(payload: unknown): ProductInput {
     name: String(source.name ?? "").trim(),
     price: Number(source.price),
     images: Array.isArray(source.images)
-      ? source.images.map((image) => String(image).trim()).filter(Boolean)
+      ? source.images
+          .map((image) => normalizeProductImageUrl(String(image).trim()))
+          .filter(Boolean)
       : [],
     description: String(source.description ?? "").trim(),
     status: source.status,
@@ -52,7 +60,7 @@ function normalizeCreateProductPayload(payload: unknown): ProductInput {
 function toApiResponse(product: ProductView) {
   return {
     ...product,
-    displayPrice: `$${product.price.toFixed(2)}`,
+    displayPrice: INRCurrencyFormatter.format(product.price),
   };
 }
 

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth";
+import { normalizeProductImageUrl } from "@/lib/image-url";
 import {
   deleteProductById,
   getProductById,
@@ -13,6 +14,11 @@ import {
 import { type ProductDetails } from "@/models/Product";
 
 export const dynamic = "force-dynamic";
+const INRCurrencyFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
 
 class RequestValidationError extends Error {
   constructor(message: string) {
@@ -52,7 +58,9 @@ function normalizeUpdateProductPayload(payload: unknown): ProductUpdateInput {
       throw new RequestValidationError("images must be an array of URLs.");
     }
 
-    const images = source.images.map((image) => String(image).trim()).filter(Boolean);
+    const images = source.images
+      .map((image) => normalizeProductImageUrl(String(image).trim()))
+      .filter(Boolean);
 
     if (images.length === 0) {
       throw new RequestValidationError("images must contain at least one item.");
@@ -111,7 +119,7 @@ function normalizeUpdateProductPayload(payload: unknown): ProductUpdateInput {
 function toApiResponse(product: ProductView) {
   return {
     ...product,
-    displayPrice: `$${product.price.toFixed(2)}`,
+    displayPrice: INRCurrencyFormatter.format(product.price),
   };
 }
 
