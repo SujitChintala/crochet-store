@@ -3,6 +3,7 @@ import { model, models, Schema, type Model } from "mongoose";
 export const PRODUCT_STATUSES = ["in_stock", "out_of_stock", "preorder"] as const;
 
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
+export type ProductDetails = Record<string, unknown>;
 
 export type ProductInput = {
   name: string;
@@ -11,7 +12,9 @@ export type ProductInput = {
   description: string;
   status?: ProductStatus;
   isAvailable?: boolean;
+  deliveryTime?: string;
   deliveryDetails?: string;
+  details?: ProductDetails;
 };
 
 export type ProductDocument = ProductInput & {
@@ -56,16 +59,29 @@ const ProductSchema = new Schema<ProductInput>(
       type: Boolean,
       default: true,
     },
-    deliveryDetails: {
+    deliveryTime: {
       type: String,
       default: "Ships within 3-5 business days.",
       trim: true,
+      maxlength: [160, "Delivery time cannot exceed 160 characters."],
+    },
+    deliveryDetails: {
+      type: String,
+      trim: true,
+      maxlength: [160, "Delivery details cannot exceed 160 characters."],
+    },
+    details: {
+      type: Map,
+      of: Schema.Types.Mixed,
+      default: {},
     },
   },
   {
     timestamps: true,
   }
 );
+
+ProductSchema.index({ status: 1, isAvailable: 1, createdAt: -1 });
 
 export const Product: Model<ProductInput> =
   (models.Product as Model<ProductInput>) || model<ProductInput>("Product", ProductSchema);
