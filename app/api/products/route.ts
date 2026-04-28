@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
+import { requireAdminUser } from "@/lib/auth";
 import {
   createProduct,
   getProducts,
@@ -91,6 +92,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdminUser(request);
+
+    if (!auth.ok) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const payload = await request.json();
     const input = normalizeCreateProductPayload(payload);
     const product = await createProduct(input);
