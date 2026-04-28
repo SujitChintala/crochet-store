@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import {
   Product,
   PRODUCT_STATUSES,
+  type ProductDetails,
   type ProductInput,
   type ProductStatus,
 } from "@/models/Product";
@@ -16,12 +17,14 @@ export type ProductView = {
   description: string;
   status: ProductStatus;
   isAvailable: boolean;
+  deliveryTime: string;
   deliveryDetails: string;
+  details: ProductDetails;
   createdAt: string;
   updatedAt: string;
 };
 
-function mapProduct(product: {
+type ProductRecord = {
   _id: { toString(): string };
   name: string;
   price: number;
@@ -29,10 +32,45 @@ function mapProduct(product: {
   description: string;
   status: ProductStatus;
   isAvailable: boolean;
-  deliveryDetails: string;
-  createdAt: Date;
-  updatedAt: Date;
-}): ProductView {
+  deliveryTime?: string;
+  deliveryDetails?: string;
+  details?: ProductDetails | Map<string, unknown>;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+};
+
+function toIsoString(value: Date | string) {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return new Date(value).toISOString();
+}
+
+function normalizeProductDetails(details: ProductRecord["details"]): ProductDetails {
+  if (!details) {
+    return {};
+  }
+
+  if (details instanceof Map) {
+    return Object.fromEntries(details.entries());
+  }
+
+  if (typeof details === "object") {
+    return details;
+  }
+
+  return {};
+}
+
+function resolveDeliveryTime(product: ProductRecord) {
+  const value = product.deliveryTime?.trim() || product.deliveryDetails?.trim();
+  return value || "Ships within 3-5 business days.";
+}
+
+function mapProduct(product: ProductRecord): ProductView {
+  const deliveryTime = resolveDeliveryTime(product);
+
   return {
     id: product._id.toString(),
     name: product.name,
@@ -41,9 +79,11 @@ function mapProduct(product: {
     description: product.description,
     status: product.status,
     isAvailable: product.isAvailable,
-    deliveryDetails: product.deliveryDetails,
-    createdAt: product.createdAt.toISOString(),
-    updatedAt: product.updatedAt.toISOString(),
+    deliveryTime,
+    deliveryDetails: deliveryTime,
+    details: normalizeProductDetails(product.details),
+    createdAt: toIsoString(product.createdAt),
+    updatedAt: toIsoString(product.updatedAt),
   };
 }
 
@@ -67,8 +107,8 @@ export async function getProducts(options?: {
     filter.isAvailable = options.onlyAvailable;
   }
 
-  const products = await Product.find(filter).sort({ createdAt: -1 }).lean();
-  return products.map((item) => mapProduct(item as never));
+  const products = await Product.find(filter).sort({ createdAt: -1 }).lean<ProductRecord[]>();
+  return products.map((item) => mapProduct(item));
 }
 
 export async function getProductById(id: string) {
@@ -77,17 +117,29 @@ export async function getProductById(id: string) {
   }
 
   await connectToDatabase();
-  const product = await Product.findById(id).lean();
+  const product = await Product.findById(id).lean<ProductRecord>();
 
   if (!product) {
     return null;
   }
 
-  return mapProduct(product as never);
+  return mapProduct(product);
 }
 
 export async function createProduct(input: ProductInput) {
   await connectToDatabase();
-  const created = await Product.create(input);
-  return mapProduct(created.toObject() as never);
+  const { deliveryDetails, ...rest } = input;
+
+  const created = await Product.create({
+    ...rest,
+    deliveryTime: rest.deliveryTime ?? deliveryDetails,
+  });
+
+  const createdProduct = await Product.findById(created._id).lean<ProductRecord>();
+
+  if (!createdProduct) {
+    throw new Error("Created product could not be loaded.");
+  }
+
+  return mapProduct(createdProduct);
 }
