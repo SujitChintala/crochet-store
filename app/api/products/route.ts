@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 import {
@@ -6,12 +7,32 @@ import {
   isValidProductStatus,
   type ProductView,
 } from "@/lib/product-service";
-import { type ProductInput } from "@/models/Product";
+import { type ProductDetails, type ProductInput } from "@/models/Product";
 
 export const dynamic = "force-dynamic";
 
+class RequestValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RequestValidationError";
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function normalizeCreateProductPayload(payload: unknown): ProductInput {
-  const source = payload as Partial<ProductInput>;
+  if (!isPlainObject(payload)) {
+    throw new RequestValidationError("Payload must be a JSON object.");
+  }
+
+  const source = payload as Partial<ProductInput> & { deliveryDetails?: string };
+  const details = source.details;
+
+  if (details !== undefined && !isPlainObject(details)) {
+    throw new RequestValidationError("details must be an object.");
+  }
 
   return {
     name: String(source.name ?? "").trim(),
@@ -22,7 +43,8 @@ function normalizeCreateProductPayload(payload: unknown): ProductInput {
     description: String(source.description ?? "").trim(),
     status: source.status,
     isAvailable: source.isAvailable,
-    deliveryDetails: String(source.deliveryDetails ?? "").trim() || undefined,
+    deliveryTime: String(source.deliveryTime ?? source.deliveryDetails ?? "").trim() || undefined,
+    details: details as ProductDetails | undefined,
   };
 }
 
@@ -38,6 +60,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get("status");
     const availableParam = searchParams.get("available");
+
+    if (statusParam && !isValidProductStatus(statusParam)) {
+      return NextResponse.json(
+        {
+          error: `Invalid status value. Use one of: in_stock, out_of_stock, preorder.`,
+        },
+        { status: 400 }
+      );
+    }
 
     const status = statusParam && isValidProductStatus(statusParam) ? statusParam : undefined;
     const onlyAvailable =
@@ -66,10 +97,29 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ product: toApiResponse(product) }, { status: 201 });
   } catch (error) {
+    if (error instanceof RequestValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    }
+
+    if (error instanceof mongoose.Error.ValidationError) {
+      const details = Object.values(error.errors).map((issue) => issue.message);
+      return NextResponse.json(
+        {
+          error: "Product validation failed.",
+          details,
+        },
+        { status: 400 }
+      );
+    }
+
     console.error("POST /api/products failed", error);
     return NextResponse.json(
-      { error: "Could not create product. Check the payload and try again." },
-      { status: 400 }
+      { error: "Could not create product. Please try again." },
+      { status: 500 }
     );
   }
 }
