@@ -34,6 +34,4 @@ const UserSchema = new Schema<UserInput>(
   }
 );
 
-UserSchema.index({ email: 1 }, { unique: true });
-
 export const User: Model<UserInput> = (models.User as Model<UserInput>) || model<UserInput>("User", UserSchema);
