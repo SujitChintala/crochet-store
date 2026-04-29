@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getProductById } from "@/lib/product-service";
+import ProductGallery from "./product-gallery";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -62,34 +62,7 @@ export default async function ProductDetailPage(props: PageProps<"/products/[id]
 
       <main className="grid gap-5 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-2 sm:p-6">
         <section className="space-y-3">
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-zinc-100">
-            <Image
-              src={product.images[0] || "/product-placeholder.svg"}
-              alt={product.name}
-              fill
-              unoptimized
-              className="object-cover"
-              sizes="(max-width: 640px) 100vw, 50vw"
-              priority
-            />
-          </div>
-
-          {product.images.length > 1 ? (
-            <div className="grid grid-cols-4 gap-2">
-              {product.images.slice(1, 5).map((image, index) => (
-                <div key={`${image}-${index}`} className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
-                  <Image
-                    src={image || "/product-placeholder.svg"}
-                    alt={`${product.name} preview ${index + 2}`}
-                    fill
-                    unoptimized
-                    className="object-cover"
-                    sizes="(max-width: 640px) 25vw, 12vw"
-                  />
-                </div>
-              ))}
-            </div>
-          ) : null}
+          <ProductGallery images={product.images} productName={product.name} />
         </section>
 
         <section className="flex flex-col gap-4">
