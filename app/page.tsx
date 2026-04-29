@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { type ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 const BRAND_PINK = "#ffc2e8";
 const BRAND_BLUE = "#00BFFF";
@@ -56,6 +56,16 @@ function toDetailsText(details?: Record<string, unknown>) {
   return JSON.stringify(details, null, 2);
 }
 
+function mergeFileLists(currentFiles: File[], nextFiles: File[]) {
+  const fileMap = new Map<string, File>();
+
+  [...currentFiles, ...nextFiles].forEach((file) => {
+    fileMap.set(`${file.name}-${file.size}-${file.lastModified}`, file);
+  });
+
+  return Array.from(fileMap.values());
+}
+
 function getAdminHeaders(session: AdminSession, withJson = false) {
   const headers = new Headers();
 
@@ -86,8 +96,10 @@ export default function Home() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [productModalMode, setProductModalMode] = useState<"add" | "edit">("add");
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingProductImages, setEditingProductImages] = useState<string[]>([]);
   const [productForm, setProductForm] = useState<ProductFormState>(EMPTY_PRODUCT_FORM);
   const [productFiles, setProductFiles] = useState<File[]>([]);
+  const productImagesInputRef = useRef<HTMLInputElement | null>(null);
   const [productFormError, setProductFormError] = useState<string | null>(null);
   const [isProductSubmitting, setIsProductSubmitting] = useState(false);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
@@ -212,6 +224,7 @@ export default function Home() {
 
     setProductModalMode("add");
     setEditingProductId(null);
+    setEditingProductImages([]);
     setProductForm(EMPTY_PRODUCT_FORM);
     setProductFiles([]);
     setProductFormError(null);
@@ -227,6 +240,7 @@ export default function Home() {
 
     setProductModalMode("edit");
     setEditingProductId(product.id);
+    setEditingProductImages(product.images);
     setProductForm({
       name: product.name,
       price: String(product.price),
@@ -237,6 +251,16 @@ export default function Home() {
     setProductFiles([]);
     setProductFormError(null);
     setShowProductModal(true);
+  };
+
+  const handleProductFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    setProductFiles((currentFiles) => mergeFileLists(currentFiles, files));
+    event.target.value = "";
+  };
+
+  const handlePickProductFiles = () => {
+    productImagesInputRef.current?.click();
   };
 
   const uploadProductImages = async (files: File[]) => {
@@ -344,8 +368,10 @@ export default function Home() {
         details,
       };
 
-      if (productModalMode === "add" || uploadedImageUrls.length > 0) {
+      if (productModalMode === "add") {
         payload.images = uploadedImageUrls;
+      } else if (uploadedImageUrls.length > 0) {
+        payload.images = Array.from(new Set([...editingProductImages, ...uploadedImageUrls]));
       }
 
       const response = await fetch(endpoint, {
@@ -367,6 +393,7 @@ export default function Home() {
       setProductForm(EMPTY_PRODUCT_FORM);
       setProductFiles([]);
       setEditingProductId(null);
+      setEditingProductImages([]);
       await fetchProducts();
     } catch (error) {
       setProductFormError(error instanceof Error ? error.message : "Could not save product.");
@@ -670,23 +697,46 @@ export default function Home() {
                   Product photos
                 </label>
                 <input
+                  ref={productImagesInputRef}
                   id="product-images"
                   type="file"
                   multiple
                   accept="image/*"
-                  onChange={(event) => {
-                    const files = Array.from(event.target.files ?? []);
-                    setProductFiles(files);
-                  }}
-                  className="mt-2 block w-full text-sm text-zinc-700 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:text-xs file:font-semibold"
-                  required={productModalMode === "add"}
+                  onChange={handleProductFilesSelected}
+                  className="hidden"
                 />
+                {productFiles.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={handlePickProductFiles}
+                    className="mt-2 inline-flex min-h-10 items-center justify-center rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-700"
+                  >
+                    Select files
+                  </button>
+                ) : (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePickProductFiles}
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-700"
+                    >
+                      Add more pics
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProductFiles([])}
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-700"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
                 <p className="mt-2 text-xs text-zinc-500">
                   {productFiles.length > 0
                     ? `${productFiles.length} image(s) selected for Cloudinary upload`
                     : productModalMode === "add"
                       ? "Select one or more images to upload to Cloudinary."
-                      : "Select files only if you want to replace existing product images."}
+                      : `Existing images: ${editingProductImages.length}. Select more files to append new images.`}
                 </p>
               </div>
 
@@ -732,6 +782,7 @@ export default function Home() {
                   onClick={() => {
                     setShowProductModal(false);
                     setProductFiles([]);
+                    setEditingProductImages([]);
                   }}
                   className="inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-300 px-3 text-sm font-semibold text-zinc-700"
                 >
