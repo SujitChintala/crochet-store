@@ -566,13 +566,13 @@ export default function Home() {
         <main id="products" className="px-4 pt-5">
           <div className="mb-6 flex items-center justify-between gap-4">
             <div className="flex-1">
-              <p className="text-xs uppercase tracking-wide text-zinc-600">Filter By</p>
+              <p className="text-xs uppercase tracking-wide text-blue-600">Filter By</p>
               <select className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900">
                 <option>All products</option>
               </select>
             </div>
             <div className="flex-1">
-              <p className="text-xs uppercase tracking-wide text-zinc-600">Sort By</p>
+              <p className="text-xs uppercase tracking-wide text-blue-600">Sort By</p>
               <select className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900">
                 <option>Featured</option>
                 <option>Price: Low to High</option>
@@ -581,10 +581,10 @@ export default function Home() {
               </select>
             </div>
           </div>
-          <p className="mb-4 text-sm font-semibold text-blue-700">{products.length} products</p>
+          <p className="mb-4 text-sm font-semibold text-blue-600">{products.length} products</p>
           <div className="grid grid-cols-2 gap-3">
             {products.map((product) => (
-              <div key={product.id} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
+              <div key={product.id}>
                 <Link href={`/products/${product.id}`} className="block">
                   <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
                     <Image
@@ -620,16 +620,7 @@ export default function Home() {
                       {deletingProductId === product.id ? "DELETING..." : "DELETE"}
                     </button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => openAuthModal("signin")}
-                    className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-full px-2 text-xs font-extrabold tracking-wide text-white"
-                    style={{ backgroundColor: BRAND_BLUE }}
-                  >
-                    ADD TO BAG
-                  </button>
-                )}
+                ) : null}
               </div>
             ))}
           </div>
