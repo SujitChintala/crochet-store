@@ -479,7 +479,7 @@ export default function Home() {
 
       <header className="sticky top-0 z-20">
         <div className="h-7" style={{ backgroundColor: BRAND_PINK }} />
-        <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3" style={{ backgroundColor: "#f6efe7" }}>
           <button
             type="button"
             aria-label="Open menu"
