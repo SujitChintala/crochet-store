@@ -580,7 +580,7 @@ export default function Home() {
             </div>
           </div>
           <p className="mb-4 text-sm font-semibold text-blue-600">{products.length} products</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-5">
             {products.map((product) => (
               <div key={product.id}>
                 <Link href={`/products/${product.id}`} className="block">
