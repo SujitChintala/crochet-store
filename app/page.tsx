@@ -628,26 +628,38 @@ export default function Home() {
       {showAuthModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-4 flex gap-2">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex gap-2 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode("signin")}
+                  className={`min-h-10 flex-1 rounded-lg text-sm font-bold ${
+                    authMode === "signin" ? "text-white" : "text-zinc-700"
+                  }`}
+                  style={{ backgroundColor: authMode === "signin" ? BRAND_BLUE : "#f3f4f6" }}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode("signup")}
+                  className={`min-h-10 flex-1 rounded-lg text-sm font-bold ${
+                    authMode === "signup" ? "text-white" : "text-zinc-700"
+                  }`}
+                  style={{ backgroundColor: authMode === "signup" ? BRAND_BLUE : "#f3f4f6" }}
+                >
+                  Sign Up
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => setAuthMode("signin")}
-                className={`min-h-10 flex-1 rounded-lg text-sm font-bold ${
-                  authMode === "signin" ? "text-white" : "text-zinc-700"
-                }`}
-                style={{ backgroundColor: authMode === "signin" ? BRAND_BLUE : "#f3f4f6" }}
+                onClick={() => setShowAuthModal(false)}
+                className="ml-2 rounded-lg p-2 text-zinc-500 hover:bg-zinc-100"
+                aria-label="Close modal"
               >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode("signup")}
-                className={`min-h-10 flex-1 rounded-lg text-sm font-bold ${
-                  authMode === "signup" ? "text-white" : "text-zinc-700"
-                }`}
-                style={{ backgroundColor: authMode === "signup" ? BRAND_BLUE : "#f3f4f6" }}
-              >
-                Sign Up
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
               </button>
             </div>
 
