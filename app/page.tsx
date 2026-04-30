@@ -490,15 +490,24 @@ export default function Home() {
               <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
-          <p className="text-3xl font-black leading-none tracking-tight">
-            <span style={{ color: BRAND_PINK, textShadow: "-1px 0 #ca488f, 0 1px #ca488f, 1px 0 #ca488f, 0 -1px #ca488f" }}>
-              Pink
-            </span>{" "}
-            <span style={{ color: "#1f2937" }}>&amp;</span>{" "}
-            <span style={{ color: BRAND_BLUE, textShadow: "-1px 0 #0284c7, 0 1px #0284c7, 1px 0 #0284c7, 0 -1px #0284c7" }}>
-              Blue
-            </span>
-          </p>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/P&B Logo without Name.svg"
+              alt="Pink&Blue Logo"
+              width={48}
+              height={48}
+              priority
+              className="object-contain"
+            />
+            <div className="leading-tight">
+              <p className="text-lg font-black tracking-tight" style={{ color: BRAND_PINK }}>
+                Pink
+                <span style={{ color: "#1f2937" }}>&</span>
+                <span style={{ color: BRAND_BLUE }}>Blue</span>
+              </p>
+              <p className="text-xs font-bold tracking-widest text-zinc-900">THE CROCHET CORNER</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => openAuthModal("signin")}
