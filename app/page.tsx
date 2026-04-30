@@ -435,7 +435,7 @@ export default function Home() {
   };
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-sm bg-white pb-8 shadow-sm">
+    <div className="mx-auto min-h-screen w-full max-w-sm pb-8 shadow-sm" style={{ backgroundColor: "#f6efe7" }}>
       {isSidebarOpen ? (
         <button
           type="button"
