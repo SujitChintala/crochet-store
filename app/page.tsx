@@ -137,7 +137,6 @@ export default function Home() {
     const rawSession = window.localStorage.getItem(SESSION_STORAGE_KEY);
 
     if (!rawSession) {
-      setShowAuthModal(true);
       return;
     }
 
@@ -153,7 +152,6 @@ export default function Home() {
     }
 
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
-    setShowAuthModal(true);
   }, []);
 
   const ctaHref = products[0] ? `/products/${products[0].id}` : "#products";
