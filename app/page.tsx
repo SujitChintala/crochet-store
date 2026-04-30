@@ -156,8 +156,7 @@ export default function Home() {
     setShowAuthModal(true);
   }, []);
 
-  const trendingProducts = products.slice(0, 8);
-  const ctaHref = trendingProducts[0] ? `/products/${trendingProducts[0].id}` : "#trending";
+  const ctaHref = products[0] ? `/products/${products[0].id}` : "#products";
 
   const openAuthModal = (mode: "signin" | "signup") => {
     setAuthMode(mode);
@@ -557,19 +556,34 @@ export default function Home() {
         </section>
       ) : null}
 
-      {!pageError && !isLoadingProducts && trendingProducts.length === 0 ? (
+      {!pageError && !isLoadingProducts && products.length === 0 ? (
         <section className="mx-4 mt-4 rounded-2xl border border-dashed border-zinc-300 bg-white p-6 text-center text-sm text-zinc-600">
           No products yet. Add your first product from the menu.
         </section>
       ) : null}
 
-      {!pageError && trendingProducts.length > 0 ? (
-        <main id="trending" className="px-4 pt-5">
-          <h2 className="mb-4 text-center text-4xl font-black leading-none tracking-tight text-zinc-900">
-            TRENDING NOW
-          </h2>
+      {!pageError && products.length > 0 ? (
+        <main id="products" className="px-4 pt-5">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-wide text-zinc-600">Filter By</p>
+              <select className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900">
+                <option>All products</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <p className="text-xs uppercase tracking-wide text-zinc-600">Sort By</p>
+              <select className="mt-2 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-semibold text-zinc-900">
+                <option>Featured</option>
+                <option>Price: Low to High</option>
+                <option>Price: High to Low</option>
+                <option>Newest</option>
+              </select>
+            </div>
+          </div>
+          <p className="mb-4 text-sm font-semibold text-blue-700">{products.length} products</p>
           <div className="grid grid-cols-2 gap-3">
-            {trendingProducts.map((product) => (
+            {products.map((product) => (
               <div key={product.id} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
                 <Link href={`/products/${product.id}`} className="block">
                   <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
@@ -584,8 +598,7 @@ export default function Home() {
                   </div>
                   <div className="px-1 pb-1 pt-2 text-center">
                     <p className="line-clamp-2 min-h-10 text-sm font-bold leading-snug text-zinc-900">{product.name}</p>
-                    <p className="mt-1 text-xs font-semibold text-zinc-500">{formatCurrency(product.price)}</p>
-                    <p className="mt-1 text-xs text-amber-500">★★★★★</p>
+                    <p className="mt-1 text-xs font-semibold text-zinc-900">Rs. {product.price.toFixed(2)}</p>
                   </div>
                 </Link>
                 {session ? (
