@@ -15,6 +15,7 @@ type Product = {
   images: string[];
   description: string;
   deliveryTime: string;
+  status?: string;
   details?: Record<string, unknown>;
 };
 
@@ -30,6 +31,7 @@ type ProductFormState = {
   description: string;
   deliveryTime: string;
   detailsText: string;
+  status: string;
 };
 
 const EMPTY_PRODUCT_FORM: ProductFormState = {
@@ -38,6 +40,7 @@ const EMPTY_PRODUCT_FORM: ProductFormState = {
   description: "",
   deliveryTime: "",
   detailsText: "",
+  status: "in_stock",
 };
 
 function formatCurrency(amount: number) {
@@ -244,6 +247,7 @@ export default function Home() {
       description: product.description,
       deliveryTime: product.deliveryTime,
       detailsText: toDetailsText(product.details),
+      status: product.status || "in_stock",
     });
     setProductFiles([]);
     setProductFormError(null);
@@ -355,6 +359,7 @@ export default function Home() {
         price: number;
         description: string;
         deliveryTime: string;
+        status: string;
         details: Record<string, unknown>;
         images?: string[];
       } = {
@@ -362,6 +367,7 @@ export default function Home() {
         price,
         description,
         deliveryTime,
+        status: productForm.status,
         details,
       };
 
@@ -597,6 +603,11 @@ export default function Home() {
                   <div className="px-1 pb-1 pt-1 text-left">
                     <p className="line-clamp-2 text-sm font-bold leading-snug text-zinc-900">{product.name}</p>
                     <p className="mt-0 text-xs font-semibold text-zinc-900">Rs. {product.price.toFixed(2)}</p>
+                    {product.status === "out_of_stock" ? (
+                      <p className="mt-1 inline-block border border-zinc-700 px-2 py-1 text-[10px] font-bold text-zinc-700">
+                        SOLD OUT
+                      </p>
+                    ) : null}
                   </div>
                 </Link>
                 {session ? (
@@ -789,6 +800,24 @@ export default function Home() {
                 placeholder="Delivery time (e.g. Ships in 2-4 days)"
                 className="h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm outline-none focus:border-zinc-500"
               />
+
+              <div className="flex items-center gap-2 rounded-lg border border-zinc-300 px-3 py-2">
+                <input
+                  type="checkbox"
+                  id="sold-out"
+                  checked={productForm.status === "out_of_stock"}
+                  onChange={(event) => 
+                    setProductForm((current) => ({
+                      ...current,
+                      status: event.target.checked ? "out_of_stock" : "in_stock",
+                    }))
+                  }
+                  className="h-4 w-4 cursor-pointer"
+                />
+                <label htmlFor="sold-out" className="flex-1 cursor-pointer text-sm font-semibold text-zinc-700">
+                  Sold Out
+                </label>
+              </div>
 
               <textarea
                 value={productForm.detailsText}
