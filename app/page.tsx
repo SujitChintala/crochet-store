@@ -584,7 +584,7 @@ export default function Home() {
             {products.map((product) => (
               <div key={product.id}>
                 <Link href={`/products/${product.id}`} className="block">
-                  <div className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100">
+                  <div className="relative aspect-square overflow-hidden bg-zinc-100">
                     <Image
                       src={product.images[0] || "/product-placeholder.svg"}
                       alt={product.name}
@@ -594,9 +594,9 @@ export default function Home() {
                       sizes="50vw"
                     />
                   </div>
-                  <div className="px-1 pb-1 pt-2 text-center">
+                  <div className="px-1 pb-1 pt-1 text-center">
                     <p className="line-clamp-2 min-h-10 text-sm font-bold leading-snug text-zinc-900">{product.name}</p>
-                    <p className="mt-1 text-xs font-semibold text-zinc-900">Rs. {product.price.toFixed(2)}</p>
+                    <p className="mt-0 text-xs font-semibold text-zinc-900">Rs. {product.price.toFixed(2)}</p>
                   </div>
                 </Link>
                 {session ? (
