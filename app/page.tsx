@@ -594,7 +594,7 @@ export default function Home() {
                       sizes="50vw"
                     />
                   </div>
-                  <div className="px-1 pb-1 pt-1 text-center">
+                  <div className="px-1 pb-1 pt-1 text-left">
                     <p className="line-clamp-2 text-sm font-bold leading-snug text-zinc-900">{product.name}</p>
                     <p className="mt-0 text-xs font-semibold text-zinc-900">Rs. {product.price.toFixed(2)}</p>
                   </div>
